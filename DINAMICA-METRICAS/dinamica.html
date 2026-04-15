@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Duelo de Escuadras - Con Preguntas Bonus</title>
+    <style>
+        :root {
+            --team-a: #e74c3c;
+            --team-b: #3498db;
+            --bg: #1a1a2e;
+        }
+        * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        body {
+            background: var(--bg);
+            color: white;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .arena {
+            width: 95%;
+            max-width: 1100px;
+            display: grid;
+            grid-template-columns: 1fr 300px 1fr;
+            gap: 20px;
+            padding: 20px;
+        }
+        .team-panel {
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            padding: 20px;
+            text-align: center;
+            border: 3px solid transparent;
+            transition: 0.3s;
+        }
+        .team-a.active { border-color: var(--team-a); box-shadow: 0 0 20px var(--team-a); }
+        .team-b.active { border-color: var(--team-b); box-shadow: 0 0 20px var(--team-b); }
+        
+        .lives-container { font-size: 2.5rem; margin: 15px 0; }
+        .member-list { font-size: 0.9rem; opacity: 0.7; }
+
+        .center-hub {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 20px;
+        }
+        .wheel-btn {
+            height: 120px;
+            width: 120px;
+            border-radius: 50%;
+            border: none;
+            background: #f39c12;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            align-self: center;
+            font-size: 1.2rem;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+        .wheel-btn:disabled { background: #555; cursor: not-allowed; }
+
+        .question-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            z-index: 100;
+        }
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            width: 100%;
+            max-width: 800px;
+            margin-top: 30px;
+        }
+        .option-btn {
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #444;
+            background: #222;
+            color: white;
+            cursor: pointer;
+            font-size: 1.1rem;
+        }
+        .option-btn:hover { background: #333; }
+
+        .result-modal {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+        }
+        .result-card {
+            background: #2c3e50;
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 400px;
+            width: 80%;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+        }
+        .result-card h2 {
+            margin-top: 0;
+        }
+        .result-card button {
+            background: #f39c12;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        .correct-result { color: #2ecc71; }
+        .wrong-result { color: #e74c3c; }
+        .bonus-badge {
+            background: #f1c40f;
+            color: #1a1a2e;
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 30px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div id="setup" class="team-panel" style="max-width: 500px;">
+    <h2>Configuración de Duelo</h2>
+    <input type="text" id="nameA" placeholder="Nombre Equipo Rojo" value="Alpha">
+    <input type="text" id="nameB" placeholder="Nombre Equipo Azul" value="Omega">
+    <p>Cada equipo debe tener entre 7 y 9 integrantes.</p>
+    <input type="number" id="sizeA" placeholder="Tamaño equipo Alpha" value="7" min="7" max="9">
+    <input type="number" id="sizeB" placeholder="Tamaño equipo Omega" value="7" min="7" max="9">
+    <button onclick="iniciarJuego()" style="padding: 15px; width: 100%; margin-top: 10px;">¡A LAS ARMAS!</button>
+</div>
+
+<div id="gameArena" class="arena hidden">
+    <div id="panelA" class="team-panel team-a">
+        <h2 id="dispNameA">Equipo A</h2>
+        <div class="lives-container" id="livesA">❤️❤️❤️</div>
+        <div class="member-list">Siguiente en responder:<br><strong id="nextA">Jugador 1</strong></div>
+    </div>
+
+    <div class="center-hub">
+        <button id="spinBtn" class="wheel-btn" onclick="lanzarAtaque()">GIRAR<br>ATAQUE</button>
+        <div id="statusMsg" style="text-align: center; color: #f39c12; font-weight: bold;"></div>
+    </div>
+
+    <div id="panelB" class="team-panel team-b">
+        <h2 id="dispNameB">Equipo B</h2>
+        <div class="lives-container" id="livesB">❤️❤️❤️</div>
+        <div class="member-list">Siguiente en responder:<br><strong id="nextB">Jugador 1</strong></div>
+    </div>
+</div>
+
+<div id="questionOverlay" class="question-overlay">
+    <div id="bonusTag" class="bonus-badge hidden">🎁 PREGUNTA BONUS 🎁</div>
+    <div id="timer" style="font-size: 3rem; color: #f39c12;">20</div>
+    <h2 id="qText" style="text-align: center; max-width: 800px;"></h2>
+    <div class="options-grid" id="qOptions"></div>
+</div>
+
+<div id="resultModal" class="result-modal">
+    <div class="result-card">
+        <h2 id="resultTitle">Resultado</h2>
+        <p id="resultMessage"></p>
+        <button id="closeResultBtn">Continuar</button>
+    </div>
+</div>
+
+<script>
+    // Preguntas normales (18)
+    const preguntas = [
+        { pregunta: "¿Qué aspecto de la recopilación de datos se encarga de determinar quién puede autorizar el uso de información sensible?", opciones: ["Seguridad multinivel", "Diseño del sistema", "Protección de datos confidenciales", "Privacidad de datos del personal"], respuesta: "Protección de datos confidenciales" },
+        { pregunta: "¿Cuál es la función principal de un diagrama de dispersión en el análisis inicial de datos?", opciones: ["Clasificar problemas por su impacto económico", "Establecer límites de control estadístico", "Mostrar relaciones empíricas entre dos características de un proceso", "Visualizar la secuencia temporal de un evento"], respuesta: "Mostrar relaciones empíricas entre dos características de un proceso" },
+        { pregunta: "Según el texto, ¿cuál es la limitación fundamental de los diagramas de dispersión convencionales?", opciones: ["Siempre asumen una variable dependiente y una independiente", "Requieren obligatoriamente datos de escala de razón", "Solo pueden manejar dos variables simultáneamente", "No permiten realizar análisis de regresión"], respuesta: "Solo pueden manejar dos variables simultáneamente" },
+        { pregunta: "¿Qué diferencia principal existe entre un gráfico de ejecución y un gráfico de control?", opciones: ["La ausencia de límites de control y línea central", "El tipo de datos que pueden representar", "La escala del eje horizontal", "La capacidad de mostrar tendencias ascendentes"], respuesta: "La ausencia de límites de control y línea central" },
+        { pregunta: "¿Por qué se recomienda anotar los gráficos de ejecución cuando ocurren cambios repentinos?", opciones: ["Para evitar el uso de límites de control", "Para ocultar las tendencias negativas", "Para calcular automáticamente la mediana", "Para relacionar variaciones con eventos específicos"], respuesta: "Para relacionar variaciones con eventos específicos" },
+        { pregunta: "En la creación de un diagrama de causa y efecto, ¿cuál es el beneficio de involucrar a expertos de diferentes partes del proceso?", opciones: ["Acelerar el proceso de dibujo técnico del diagrama", "Proporcionar una base de experiencia observacional amplia", "Reducir el número de ramas en el esqueleto de pescado", "Garantizar que el diagrama sea puramente objetivo"], respuesta: "Proporcionar una base de experiencia observacional amplia" },
+        { pregunta: "¿Cuál es la característica distintiva del diagrama de causa y efecto de tipo 'enumeración de causa'?", opciones: ["Evita el uso de sesiones de lluvia de ideas", "Organiza todas las causas posibles en categorías principales", "Sigue los pasos del proceso de producción de forma secuencial", "Se enfoca exclusivamente en por qué se produce la dispersión"], respuesta: "Organiza todas las causas posibles en categorías principales" },
+        { pregunta: "Según Ishikawa, ¿qué suele indicar un diagrama de causa y efecto que tiene muchas ramificaciones pero pocas líneas secundarias?", opciones: ["Que el problema analizado es de naturaleza simple", "Una comprensión superficial del proceso", "Un proceso de alta calidad sin defectos", "Un uso correcto de la técnica de enumeración"], respuesta: "Una comprensión superficial del proceso" },
+        { pregunta: "¿Cómo se determina la altura de las barras en un histograma?", opciones: ["Depende del valor económico del defecto encontrado", "Se define por la importancia subjetiva del proceso", "Es igual al ancho de la celda en la escala continua", "Es proporcional al número de ocurrencias dentro de cada celda"], respuesta: "Es proporcional al número de ocurrencias dentro de cada celda" },
+        { pregunta: "En un histograma, ¿qué puede indicar la presencia de dos picos consecutivos (distribución bimodal)?", opciones: ["Que los datos provienen de dos fuentes distintas", "Que se debe dejar de recopilar datos inmediatamente", "Que el intervalo de las celdas es demasiado ancho", "Que el proceso está bajo control estadístico perfecto"], respuesta: "Que los datos provienen de dos fuentes distintas" },
+        { pregunta: "¿Cuál es una diferencia clave entre los gráficos de barras y los histogramas?", opciones: ["Los histogramas siempre tienen espacios entre sus celdas", "Los gráficos de barras se definen a partir de valores discretos", "Los histogramas siempre usan colores para distinguir datos", "Los gráficos de barras no pueden mostrar costos o tiempo"], respuesta: "Los gráficos de barras se definen a partir de valores discretos" },
+        { pregunta: "¿Cuál es el propósito principal del análisis de Pareto?", opciones: ["Identificar relaciones de causa y efecto mediante regresión", "Distinguir lo esencial de lo superfluo para priorizar acciones", "Calcular la desviación estándar de un proceso de software", "Sustituir la necesidad de recopilar datos a lo largo del tiempo"], respuesta: "Distinguir lo esencial de lo superfluo para priorizar acciones" },
+        { pregunta: "¿Qué advertencia hace el autor sobre el uso de diagramas de Pareto en procesos inestables?", opciones: ["Las variaciones radicales pueden ocurrir sin haber tomado medidas", "Los directivos no podrán compartir una visión común", "El costo de las celdas siempre será igual a cero", "Es imposible dibujar el gráfico en orden descendente"], respuesta: "Las variaciones radicales pueden ocurrir sin haber tomado medidas" },
+        { pregunta: "¿Qué componente es esencial incluir en un diagrama de Pareto para que pueda ser interpretado correctamente?", opciones: ["El período de tiempo cubierto por los datos", "El nombre del hardware utilizado para el análisis", "La firma de todos los ingenieros de software", "Una línea que represente la regresión lineal"], respuesta: "El período de tiempo cubierto por los datos" },
+        { pregunta: "¿Qué tarea de recopilación de datos implica especificar 'dónde, cuándo y cómo' se realizarán las mediciones?", opciones: ["Definición de procedimientos operativos", "Establecimiento de la visión común", "Selección de herramientas de hardware", "Análisis de Pareto"], respuesta: "Definición de procedimientos operativos" },
+        { pregunta: "¿Qué papel juegan los formularios estándar en el proceso de recopilación de datos?", opciones: ["Eliminan la necesidad de capacitar al personal", "Garantizan que los datos sean analizados automáticamente", "Sustituyen el uso de bases de datos", "Simplifican el registro manual de la información"], respuesta: "Simplifican el registro manual de la información" },
+        { pregunta: "¿Qué se busca al investigar la 'dispersión' en un diagrama de causa y efecto?", opciones: ["Listar todos los materiales utilizados en la producción", "Identificar el paso exacto del proceso donde ocurrió el error", "Asegurar que no se pasen por alto causas menores", "Organizar los factores que causan variabilidad en los resultados"], respuesta: "Organizar los factores que causan variabilidad en los resultados" },
+        { pregunta: "¿Por qué se considera que un gráfico de barras es más flexible que un histograma en cuanto a los valores que representa?", opciones: ["Puede mostrar cualquier valor numérico, no solo frecuencias", "Siempre garantiza una distribución normal de los datos", "No requiere un eje vertical para mostrar información", "Permite el uso de escalas continuas sin intervalos"], respuesta: "Puede mostrar cualquier valor numérico, no solo frecuencias" }
+    ];
+
+    // Preguntas BONUS (3)
+    const preguntasBonus = [
+        { pregunta: "Si hay tres manzanas en una mesa y tú tomas dos, ¿cuántas manzanas tienes?", opciones: ["Una manzana", "Dos manzanas", "Tres manzanas", "Ninguna, porque no eran mías"], respuesta: "Dos manzanas", explicacion: "¡Correcto! Tú tomaste dos, así que tienes dos, no las que quedan en la mesa." },
+        { pregunta: "Algunos meses tienen 31 días, otros tienen 30. ¿Cuántos meses tienen 28 días?", opciones: ["Solo febrero", "Depende de si el año es bisiesto", "Todos los meses del año", "No se puede saber sin un calendario a la mano"], respuesta: "Todos los meses del año", explicacion: "¡Exacto! Todos los meses tienen al menos 28 días." },
+        { pregunta: "Estás participando en una carrera de relevos y, tras un gran esfuerzo, logras adelantar a la persona que va en segundo lugar. ¿En qué posición estás ahora?", opciones: ["En primer lugar", "En tercer lugar", "En segundo lugar", "Depende de si el primero ya cruzó la meta"], respuesta: "En segundo lugar", explicacion: "Correcto. Si adelantas al segundo, tú ocupas su lugar: segundo puesto." }
+    ];
+
+    let state = {
+        teams: [
+            { id: 0, nombre: "", vidas: 5, actualMember: 1, totalMembers: 7 },
+            { id: 1, nombre: "", vidas: 5, actualMember: 1, totalMembers: 7 }
+        ],
+        turnoDe: null,
+        preguntaActiva: null,
+        esPreguntaBonus: false,   // indica si la pregunta actual es bonus
+        timerInterval: null,
+        juegoTerminado: false,
+        esperandoResultado: false
+    };
+
+    const spinBtn = document.getElementById('spinBtn');
+    const questionOverlay = document.getElementById('questionOverlay');
+    const resultModal = document.getElementById('resultModal');
+    const closeResultBtn = document.getElementById('closeResultBtn');
+    const bonusTag = document.getElementById('bonusTag');
+
+    function iniciarJuego() {
+        state.teams[0].nombre = document.getElementById('nameA').value || "Alpha";
+        state.teams[1].nombre = document.getElementById('nameB').value || "Omega";
+        state.teams[0].totalMembers = parseInt(document.getElementById('sizeA').value);
+        state.teams[1].totalMembers = parseInt(document.getElementById('sizeB').value);
+        state.teams[0].actualMember = 1;
+        state.teams[1].actualMember = 1;
+        state.teams[0].vidas = 5;
+        state.teams[1].vidas = 5;
+        state.juegoTerminado = false;
+        state.turnoDe = null;
+        
+        document.getElementById('setup').classList.add('hidden');
+        document.getElementById('gameArena').classList.remove('hidden');
+        spinBtn.disabled = false;
+        document.getElementById('statusMsg').innerText = "¡Gira la ruleta para decidir quién ataca primero!";
+        
+        actualizarUI();
+    }
+
+    function actualizarUI() {
+        document.getElementById('dispNameA').innerText = state.teams[0].nombre;
+        document.getElementById('dispNameB').innerText = state.teams[1].nombre;
+        document.getElementById('livesA').innerText = "❤️".repeat(state.teams[0].vidas);
+        document.getElementById('livesB').innerText = "❤️".repeat(state.teams[1].vidas);
+        document.getElementById('nextA').innerText = `Integrante ${state.teams[0].actualMember}`;
+        document.getElementById('nextB').innerText = `Integrante ${state.teams[1].actualMember}`;
+        
+        document.getElementById('panelA').classList.remove('active');
+        document.getElementById('panelB').classList.remove('active');
+        if (state.turnoDe !== null && !state.juegoTerminado) {
+            if (state.turnoDe === 0) document.getElementById('panelA').classList.add('active');
+            else document.getElementById('panelB').classList.add('active');
+        }
+    }
+
+    function lanzarAtaque() {
+        if (state.juegoTerminado) return;
+        if (state.esperandoResultado) {
+            document.getElementById('statusMsg').innerText = "Espera a que termine el resultado anterior.";
+            return;
+        }
+        
+        if (state.turnoDe === null) {
+            const primero = Math.floor(Math.random() * 2);
+            state.turnoDe = primero;
+            document.getElementById('statusMsg').innerText = `${state.teams[state.turnoDe].nombre} comienza atacando. ¡Preparen sus respuestas!`;
+            actualizarUI();
+            const defensor = state.teams[state.turnoDe === 0 ? 1 : 0];
+            mostrarPregunta(defensor);
+        } 
+        else {
+            state.turnoDe = state.turnoDe === 0 ? 1 : 0;
+            const atacante = state.teams[state.turnoDe];
+            const defensor = state.teams[state.turnoDe === 0 ? 1 : 0];
+            document.getElementById('statusMsg').innerText = `${atacante.nombre} lanza un ataque a ${defensor.nombre}`;
+            actualizarUI();
+            mostrarPregunta(defensor);
+        }
+    }
+
+    function mostrarPregunta(equipoQueResponde) {
+        if (state.juegoTerminado) return;
+        
+        // Determinar si es pregunta bonus (vidas <= 2)
+        const esBonus = equipoQueResponde.vidas <= 2;
+        state.esPreguntaBonus = esBonus;
+        
+        let pregunta;
+        if (esBonus) {
+            const idx = Math.floor(Math.random() * preguntasBonus.length);
+            pregunta = preguntasBonus[idx];
+            bonusTag.classList.remove('hidden');
+        } else {
+            const idx = Math.floor(Math.random() * preguntas.length);
+            pregunta = preguntas[idx];
+            bonusTag.classList.add('hidden');
+        }
+        state.preguntaActiva = pregunta;
+        
+        let textoPregunta = pregunta.pregunta;
+        if (esBonus) textoPregunta = "🎁 PREGUNTA BONUS 🎁\n\n" + textoPregunta;
+        document.getElementById('qText').innerHTML = `PARA ${equipoQueResponde.nombre} (Integrante ${equipoQueResponde.actualMember}):<br><br>${textoPregunta}`;
+        
+        const opts = document.getElementById('qOptions');
+        opts.innerHTML = '';
+        pregunta.opciones.forEach(o => {
+            const b = document.createElement('button');
+            b.className = 'option-btn';
+            b.innerText = o;
+            b.onclick = () => validarRespuesta(o, equipoQueResponde);
+            opts.appendChild(b);
+        });
+        
+        let timeLeft = 20;
+        const timerDiv = document.getElementById('timer');
+        timerDiv.innerText = timeLeft;
+        if (state.timerInterval) clearInterval(state.timerInterval);
+        state.timerInterval = setInterval(() => {
+            if (state.juegoTerminado) return;
+            if (state.esperandoResultado) return;
+            timeLeft--;
+            timerDiv.innerText = timeLeft;
+            if (timeLeft <= 0) {
+                clearInterval(state.timerInterval);
+                // Tiempo agotado: el defensor pierde 1 vida (sin efecto bonus)
+                equipoQueResponde.vidas = Math.max(0, equipoQueResponde.vidas - 1);
+                mostrarResultadoModal(false, equipoQueResponde, null, true);
+                rotarIntegrante(equipoQueResponde);
+                questionOverlay.style.display = 'none';
+                actualizarUI();
+                verificarGanador();
+                setTimeout(() => { state.esperandoResultado = false; }, 500);
+            }
+        }, 1000);
+        
+        questionOverlay.style.display = 'flex';
+    }
+
+    function validarRespuesta(choice, equipo) {
+        if (state.juegoTerminado) return;
+        if (state.esperandoResultado) return;
+        if (state.timerInterval) clearInterval(state.timerInterval);
+        
+        const esCorrecto = choice === state.preguntaActiva.respuesta;
+        const atacante = state.teams[state.turnoDe];
+        
+        if (state.esPreguntaBonus) {
+            if (esCorrecto) {
+                // Bonus: el equipo que responde suma 2 vidas (máximo 5)
+                let nuevasVidas = equipo.vidas + 2;
+                if (nuevasVidas > 5) nuevasVidas = 5;
+                equipo.vidas = nuevasVidas;
+                mostrarResultadoModal(true, equipo, atacante, false, true);
+            } else {
+                // Fallo en bonus: pierde 1 vida como siempre
+                equipo.vidas--;
+                mostrarResultadoModal(false, equipo, atacante, false, true);
+            }
+        } else {
+            // Pregunta normal
+            if (esCorrecto) {
+                atacante.vidas--;
+                mostrarResultadoModal(true, equipo, atacante, false, false);
+            } else {
+                equipo.vidas--;
+                mostrarResultadoModal(false, equipo, atacante, false, false);
+            }
+        }
+        
+        rotarIntegrante(equipo);
+        questionOverlay.style.display = 'none';
+        actualizarUI();
+        verificarGanador();
+    }
+
+    function mostrarResultadoModal(esCorrecto, equipoRespondio, atacante, porTiempo = false, esBonus = false) {
+        state.esperandoResultado = true;
+        const titleElem = document.getElementById('resultTitle');
+        const msgElem = document.getElementById('resultMessage');
+        
+        if (porTiempo) {
+            titleElem.innerHTML = '<span class="wrong-result">⏰ TIEMPO AGOTADO</span>';
+            msgElem.innerHTML = `${equipoRespondio.nombre} no respondió a tiempo.<br>Pierde 1 vida.`;
+        } 
+        else if (esBonus) {
+            if (esCorrecto) {
+                titleElem.innerHTML = '<span class="correct-result">🎉 ¡BONUS CORRECTO! 🎉</span>';
+                msgElem.innerHTML = `${equipoRespondio.nombre} ha acertado la pregunta bonus.<br>¡Recupera 2 vidas!<br>${state.preguntaActiva.explicacion || ''}`;
+            } else {
+                titleElem.innerHTML = '<span class="wrong-result">❌ BONUS FALLADO</span>';
+                msgElem.innerHTML = `${equipoRespondio.nombre} falló la pregunta bonus.<br>Pierde 1 vida.`;
+            }
+        }
+        else {
+            if (esCorrecto) {
+                titleElem.innerHTML = '<span class="correct-result">✅ ¡RESPUESTA CORRECTA!</span>';
+                msgElem.innerHTML = `${equipoRespondio.nombre} ha acertado.<br>El ataque es repelido: ${atacante.nombre} pierde 1 vida.`;
+            } else {
+                titleElem.innerHTML = '<span class="wrong-result">❌ RESPUESTA INCORRECTA</span>';
+                msgElem.innerHTML = `${equipoRespondio.nombre} ha fallado.<br>Pierde 1 vida.`;
+            }
+        }
+        
+        resultModal.style.display = 'flex';
+        closeResultBtn.onclick = () => {
+            resultModal.style.display = 'none';
+            state.esperandoResultado = false;
+            if (!state.juegoTerminado) verificarGanador();
+        };
+    }
+    
+    function rotarIntegrante(equipo) {
+        equipo.actualMember++;
+        if (equipo.actualMember > equipo.totalMembers) {
+            equipo.actualMember = 1;
+        }
+    }
+
+    function verificarGanador() {
+        if (state.teams[0].vidas <= 0) {
+            state.juegoTerminado = true;
+            spinBtn.disabled = true;
+            if (state.timerInterval) clearInterval(state.timerInterval);
+            questionOverlay.style.display = 'none';
+            setTimeout(() => {
+                alert(`🏆 ¡${state.teams[1].nombre} HA GANADO LA GUERRA! 🏆`);
+            }, 100);
+        } else if (state.teams[1].vidas <= 0) {
+            state.juegoTerminado = true;
+            spinBtn.disabled = true;
+            if (state.timerInterval) clearInterval(state.timerInterval);
+            questionOverlay.style.display = 'none';
+            setTimeout(() => {
+                alert(`🏆 ¡${state.teams[0].nombre} HA GANADO LA GUERRA! 🏆`);
+            }, 100);
+        }
+    }
+</script>
+</body>
+</html>
